@@ -1,0 +1,2 @@
+{"name":"Green Horizon Layer Growth Model","short_name":"GH Growth","description":"Layer flock growth planner","start_url":"./","scope":"./","display":"standalone","background_color":"#F5F6F0","theme_color":"#1F4D3A",
+"icons":[{"src":"icon-192.png","sizes":"192x192","type":"image/png"},{"src":"icon-512.png","sizes":"512x512","type":"image/png"},{"src":"icon-512-maskable.png","sizes":"512x512","type":"image/png","purpose":"maskable"}]}
