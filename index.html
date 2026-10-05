@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Green Horizon — Layer Growth Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+:root{--bg:#F5F6F0;--surface:#fff;--alt:#EAEEE3;--ink:#23261F;--soft:#6E7266;--green:#1F4D3A;--gold:#C98A1F;--goldsoft:#F3E0B4;--clay:#8C3B2E;--rule:#DEDCC9;--r:12px;--sh:0 1px 2px rgba(35,38,31,.06),0 4px 14px rgba(35,38,31,.06);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141713;--surface:#1D211B;--alt:#262B23;--ink:#E8EBE2;--soft:#9AA092;--green:#6DB38E;--gold:#E0A944;--goldsoft:#3A311A;--clay:#D98A7B;--rule:#33382F}}
+:root[data-theme="dark"]{--bg:#141713;--surface:#1D211B;--alt:#262B23;--ink:#E8EBE2;--soft:#9AA092;--green:#6DB38E;--gold:#E0A944;--goldsoft:#3A311A;--clay:#D98A7B;--rule:#33382F}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif}
+header{background:#1F4D3A;color:#fff;padding:22px 20px 26px}
+header h1{font:700 24px 'Space Grotesk',sans-serif;margin:0 0 4px}
+header p{margin:0;opacity:.8;max-width:60ch}
+main{max-width:1080px;margin:0 auto;padding:18px 16px 40px}
+h2{font:600 17px 'Space Grotesk',sans-serif;margin:26px 0 10px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);box-shadow:var(--sh);padding:12px 14px}
+.card small{color:var(--soft);display:block}
+.card b{display:block;overflow:hidden;white-space:nowrap;font:500 20px 'IBM Plex Mono',monospace;color:var(--green)}
+.card.hero{background:#1F4D3A;border-color:#1F4D3A}.card.hero small{color:#cfe0d6}.card.hero b{color:#fff;font-size:24px}
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);box-shadow:var(--sh);padding:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px 14px}
+label{display:block;font-size:12.5px;color:var(--soft)}
+input[type=text]{font-size:13px}input{width:100%;margin-top:3px;padding:7px 9px;border:1px solid var(--rule);border-radius:8px;background:var(--alt);color:var(--ink);font:500 14px 'IBM Plex Mono',monospace}
+input:focus-visible,button:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+.grp{font:600 13px 'Space Grotesk',sans-serif;color:var(--green);margin:16px 0 8px;padding-top:10px;border-top:1px solid var(--rule)}
+.grp:first-child{margin-top:0;border:0;padding:0}
+button{font:600 13px Inter,sans-serif;padding:8px 14px;border-radius:8px;border:1px solid var(--green);background:transparent;color:var(--green);cursor:pointer}
+.wrap{overflow-x:auto;border-radius:var(--r);border:1px solid var(--rule)}
+table{border-collapse:collapse;width:100%;font:500 12.5px 'IBM Plex Mono',monospace;background:var(--surface)}
+th,td{padding:6px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--rule)}
+th{position:sticky;top:0;background:var(--alt);font:600 12px Inter,sans-serif;color:var(--soft)}
+td:first-child,th:first-child{text-align:left;position:sticky;left:0;background:var(--alt)}
+tr.hit td{background:var(--goldsoft)}
+.neg{color:var(--clay)}
+.note{color:var(--soft);font-size:13px;margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+<h1>Green Horizon — Layer Growth Model</h1>
+<p>From your starting flock to the target, reinvesting profit into new pullets. Change any number below and everything recalculates.</p>
+</header>
+<main>
+<div class="cards" id="sum"></div>
+<h2>Assumptions</h2>
+<div class="panel"><div id="inputs"></div>
+<p class="note">Cash never goes below zero: if your money can't cover the starting flock plus its running costs, the model buys fewer starting birds, and later purchases only happen when cash covers them (after the buffer).</p>
+<p class="note">Interest is entered as a yearly percentage. Laying curve = share of hens laying in each month since reaching lay age (Bovans Brown guide values from your workbook).</p>
+<button id="reset" type="button">Reset to workbook values</button></div>
+<h2>Month by month</h2>
+<button id="dl" type="button" style="margin-bottom:10px">Download table (CSV, opens in Excel)</button>
+<div class="wrap" style="max-height:480px"><table id="tbl"></table></div>
+<p class="note">The table runs from month 0 to the month the target flock is reached (highlighted). If the target is never reached, it shows all 200 months. Houses, labour and other bracket costs use last month's flock size, as in the workbook.</p>
+</main>
+<script>
+const DEF={useLoan:true,cash:0,loan:850000,rate:8,term:36,freq:1,mort:5,price:800,rearG:68.5,feedKg:0.12,feedQ:9000,egg:20,hen:800,days:30,
+labC:6000,labB:1000,exCap:550,newCap:2000,rent:30000,minB:1000,buf:100000,init:550,target:10000,plan:'12:750, 13-18:0, 19:550, 24:1000, 29:1500, 33:1500, 36:1800, 39-48:0',
+elec:3000,med:5000,oth:5000,brk:1000,
+lay:[41.2,95.1,96.4,96.5,96,95.2,94.3,93.3,92,90.5,89.3,87.8,86,84.1,81.9]};
+const F=[
+['Birds',[['init','Starting flock (birds)'],['target','Target flock (birds)'],['mort','Rearing mortality (%)'],['price','Purchase cost per pullet (Birr)'],['hen','Spent hen sale price (Birr)']]],
+['Feed & eggs',[['rearG','Rearing feed (g/bird/day)'],['feedKg','Laying feed (kg/bird/day)'],['feedQ','Feed price (Birr per quintal)'],['egg','Egg price (Birr)'],['days','Days per month']]],
+['Housing',[['exCap','Existing house capacity (free)'],['newCap','New rented house capacity'],['rent','Rent per extra house (Birr/month)']]],
+['Bracket costs (per bracket of birds, on total flock)',[['brk','Birds per bracket (elec, medical, other)'],['labB','Birds per labour bracket'],['labC','Labour per bracket (Birr/month)'],['elec','Electricity & water per bracket'],['med','Medical per bracket'],['oth','Other per bracket']]],
+['Reinvestment rule',[['minB','Minimum batch to trigger a purchase (birds)'],['buf','Cash buffer kept in hand (Birr)']]]];
+let CSV='',A;try{A=JSON.parse(localStorage.getItem('gh-growth'))}catch(e){}
+A=Object.assign(JSON.parse(JSON.stringify(DEF)),A||{});if(typeof A.plan!=='string')A.plan=DEF.plan;if(!Array.isArray(A.lay)||A.lay.length!=15)A.lay=DEF.lay.slice();
+const $=id=>document.getElementById(id),N=v=>Math.round(v).toLocaleString('en-US');
+function parsePlan(s){const m=new Map();String(s||'').split(',').forEach(x=>{const q=x.trim().match(/^(\d+)(?:-(\d+))?\s*:\s*(\d+)$/);if(q)for(let i=+q[1];i<=+(q[2]||q[1]);i++)m.set(i,+q[3])});return m}
+function run(a){const plan=parsePlan(a.plan),P=[],mn=r=>Math.min(...r.X),H=t=>Math.min(200,t+31);
+ for(let t=0;t<200;t++){
+  const V=core(a,P.concat(0),H(t)).V[t];
+  let d=t==0?a.init:plan.has(t)?plan.get(t):((V-a.buf>=a.minB*a.price)?Math.floor((V-a.buf)/a.price):0);
+  d=Math.max(0,Math.floor(d));
+  if(d>0&&mn(core(a,P.concat(d),H(t)))<-0.5){let lo=0,hi=d;while(hi-lo>1){const m=(lo+hi)>>1;if(mn(core(a,P.concat(m),H(t)))>=-0.5)lo=m;else hi=m}d=lo}
+  P.push(d)}
+ return core(a,P,200)}
+function core(a,PL,n0){const LN=a.useLoan?a.loan:0,n=n0,z=()=>new Array(n).fill(0),B=z(),C=z(),D=z(),E=z(),Fr=z(),G=z(),H=z(),I=z(),J=z(),K=z(),L=z(),M=z(),Nl=z(),O=z(),P=z(),Q=z(),R=z(),S=z(),T=z(),U=z(),V=z(),W=z(),X=z();
+ const mort=a.mort/100,fp=a.feedQ/100,rm=a.rate/100/12,rp=Math.pow(1+rm,a.freq)-1,k=a.term/a.freq,
+ pay=LN<=0?0:rp>0?LN*rp/(1-Math.pow(1+rp,-k)):LN/k,br=g=>Math.ceil(g/a.brk);
+ for(let t=0;t<n;t++){
+  const p=Math.max(t-1,0);
+  C[t]=t>=2?B[t-2]*(1-mort):0; D[t]=t>=15?C[t-15]:0;
+  E[t]=(t?E[t-1]:0)+C[t]-D[t];
+  let e=0;for(let j=0;j<15&&t-j>=0;j++)e+=C[t-j]*a.lay[j]/100;I[t]=e*a.days;
+  const gp=t?G[t-1]:0, fprev=t?Fr[t-1]:Fr[0];
+  B[t]=t<PL.length?PL[t]:0;
+  H[t]=t==0?1:(G[p]<=a.exCap?1:1+Math.ceil((G[p]-a.exCap)/a.newCap));
+  J[t]=I[t]*a.egg;K[t]=D[t]*a.hen;L[t]=E[t]*a.feedKg*a.days*fp;
+  M[t]=(t==0?B[0]:fprev)*a.rearG/1000*a.days*fp;
+  const gb=t==0?B[0]:gp;
+  Nl[t]=Math.ceil(gb/a.labB)*a.labC;O[t]=br(gb)*a.elec;P[t]=br(gb)*a.med;Q[t]=br(gb)*a.oth;R[t]=Math.max(0,H[t]-1)*a.rent;
+  const tp=t?T[t-1]:LN;
+  S[t]=(tp>0&&(t+1)%a.freq==0)?Math.min(pay,tp*(1+rm)):0;T[t]=tp*(1+rm)-S[t];
+  U[t]=J[t]+K[t]-L[t]-M[t]-Nl[t]-O[t]-P[t]-Q[t]-R[t]-S[t];
+  V[t]=(t?X[t-1]:LN+a.cash)+U[t];
+  Fr[t]=t==0?B[0]:Fr[t-1]+B[t]-(t>=2?B[t-2]:0);
+  G[t]=E[t]+Fr[t];W[t]=B[t]*a.price;X[t]=V[t]-W[t];
+ }
+ const tm=G.findIndex(g=>g>=a.target),rep=LN>0?T.findIndex(v=>v<=0):-1;
+ const sm=arr=>arr.reduce((s,v)=>s+v,0);
+ return{B,C,D,E,Fr,G,H,I,J,K,S,T,U,V,X,tm,rep,pay,interest:sm(S)-LN,eggs:sm(I),hens:sm(K),n};
+}
+function fit(){document.querySelectorAll('.card b').forEach(b=>{b.style.fontSize='';let f=parseFloat(getComputedStyle(b).fontSize);while(b.scrollWidth>b.clientWidth&&f>8){f-=.5;b.style.fontSize=f+'px'}})}
+window.addEventListener('resize',fit);if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fit);
+function draw(){
+ const r=run(A),ym=m=>Math.floor(m/12)+' yr '+(m%12)+' mo';
+ const cut=r.B[0]<A.init,lowM=Math.min(...r.X);
+ const cards=[...(cut?[['','Starting flock bought',N(r.B[0])+' of '+N(A.init)]]:[]),['hero','Target reached',r.tm>=0?'Month '+r.tm:'Not within 200 months'],['hero','In years',r.tm>=0?ym(r.tm):'-'],
+ ...(A.useLoan?[['','Loan fully repaid',r.rep>=0?'Month '+r.rep:'-'],['','Total interest (Birr)',N(r.interest)],['','Payment per installment',N(r.pay)]]:[['','Funding','Own cash, no interest']]),
+ ['','Lowest cash balance',N(lowM)],['','Houses at target',r.tm>=0?r.H[r.tm]:'-'],
+ ['','Eggs sold (200 mo)',N(r.eggs)],['','Spent-hen revenue',N(r.hens)]];
+ $('sum').innerHTML=cards.map(c=>`<div class="card ${c[0]}"><small>${c[1]}</small><b>${c[2]}</b></div>`).join('');
+ fit();
+ const last=r.tm>=0?r.tm:r.n-1;
+ const cols=[['B','Bought'],['C','Matured'],['D','Culled'],['E','Laying'],['Fr','Rearing'],['G','Total'],['H','Houses'],['J','Egg revenue'],['U','Net profit'],['T','Loan balance'],['X','Cash']];
+ let h='<tr><th>Month</th>'+cols.map(c=>`<th>${c[1]}</th>`).join('')+'</tr>';
+ for(let t=0;t<=last;t++)h+=`<tr class="${t===r.tm?'hit':''}"><td>${t}</td>`+cols.map(c=>{const v=r[c[0]][t];return`<td class="${v<0?'neg':''}">${N(v)}</td>`}).join('')+'</tr>';
+ $('tbl').innerHTML=h;
+ CSV=[cols.map(c=>c[1]).reduce((x,y)=>x+','+y,'Month')].concat(Array.from({length:last+1},(_,t)=>t+','+cols.map(c=>Math.round(r[c[0]][t])).join(','))).join('\r\n');
+ try{localStorage.setItem('gh-growth',JSON.stringify(A))}catch(e){}
+}
+function build(){
+ const lf=[['loan','Loan amount (Birr)'],['rate','Annual interest rate (%)'],['term','Loan term (months)'],['freq','Months per installment (1 = monthly)']];
+ $('inputs').innerHTML=`<div class="grp">Funding</div><label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px"><input type="checkbox" data-u="1" style="width:auto;margin:0" ${A.useLoan?'checked':''}> Use a bank loan (untick to start with your own cash, no interest)</label>
+ <div class="grid" style="margin-top:10px"><label>Own cash at start (Birr)<input type="number" inputmode="decimal" step="any" data-k="cash" value="${A.cash}"></label>`+lf.map(f=>`<label class="lf" ${A.useLoan?'':'hidden'}>${f[1]}<input type="number" inputmode="decimal" step="any" data-k="${f[0]}" value="${A[f[0]]}"></label>`).join('')+'</div>'+F.map(g=>`<div class="grp">${g[0]}</div><div class="grid">`+g[1].map(f=>`<label>${f[1]}<input type="number" inputmode="decimal" step="any" data-k="${f[0]}" value="${A[f[0]]}"></label>`).join('')+'</div>').join('')
+ +`<label style="margin-top:10px">Manual purchase plan — month:birds, ranges allowed (e.g. 12:750, 13-18:0). Months not listed follow the automatic rule. Clear the box for fully automatic.<input type="text" data-p="1" value="${A.plan}"></label>`+'<div class="grp">Laying curve (% laying, by month since lay age)</div><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(90px,1fr))">'+A.lay.map((v,i)=>`<label>Month ${i+1}<input type="number" step="any" data-l="${i}" value="${v}"></label>`).join('')+'</div>';
+}
+$('inputs').addEventListener('input',e=>{const t=e.target,v=parseFloat(t.value);if(t.dataset.u){A.useLoan=t.checked;document.querySelectorAll('.lf').forEach(x=>x.hidden=!t.checked);draw();return}if(t.dataset.p){A.plan=t.value;draw();return}if(isNaN(v))return;
+ if(t.dataset.k){if((t.dataset.k==='freq'||t.dataset.k==='term'||t.dataset.k==='brk'||t.dataset.k==='labB'||t.dataset.k==='newCap'||t.dataset.k==='days')&&v<=0)return;A[t.dataset.k]=v}else A.lay[+t.dataset.l]=v;draw()});
+$('dl').onclick=()=>{try{const u=URL.createObjectURL(new Blob(['\ufeff'+CSV],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=u;a.download='green-horizon-growth-model.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000)}catch(e){alert('Download is not available here. Open the GitHub page or a normal browser tab.')}};
+$('reset').onclick=()=>{A=JSON.parse(JSON.stringify(DEF));build();draw()};
+build();draw();
+</script>
+</body>
+</html>
